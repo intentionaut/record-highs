@@ -57,6 +57,10 @@ Each line is checked by `scripts/check-promises.sh`. It searches the source and 
 
 Record Highs is made by Saielle DaSilva at [Intentionaut](https://intentionaut.com): product, design, data and AI.
 
+## Support
+
+Record Highs is free to use for non-commercial purposes. Tips go toward the time I spend building and maintaining it: [ko-fi.com/intentionaut](https://ko-fi.com/intentionaut)
+
 ## License
 
 Source available for non-commercial use.
