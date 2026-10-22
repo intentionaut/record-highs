@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleName</key><string>Record Highs</string>
+  <!-- Kept from the first name so saved weeks and settings carry over. -->
+  <key>CFBundleIdentifier</key><string>org.soundoftheweek.app</string>
+  <key>CFBundleExecutable</key><string>RecordHighs</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSAppleEventsUsageDescription</key><string>Reads the current track, album and artwork from Apple Music. Nothing is sent anywhere.</string>
+</dict></plist>
