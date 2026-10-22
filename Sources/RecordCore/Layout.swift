@@ -11,7 +11,7 @@ public struct Cell: Equatable { public let cover: CGRect; public let caption: CG
 /// 3 columns x 2 rows under a header band. Covers are square and centred in each cell.
 public func gridLayout(_ size: PosterSize, margin: CGFloat = 48, gap: CGFloat = 32) -> (header: CGRect, cells: [Cell]) {
     let s = size.pixels
-    let headerH: CGFloat = 216   // room for a two-line vibe
+    let headerH: CGFloat = 270   // room for a three-line vibe at 30pt
     let captionH: CGFloat = 94   // two-line title plus artist
     let colW = (s.width - 2 * margin - 2 * gap) / 3
     let rowH = (s.height - 2 * margin - headerH - 2 * gap) / 2

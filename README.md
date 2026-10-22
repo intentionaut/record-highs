@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="320" alt="Record Highs: a vinyl record rising over a horizon like a sunrise, above the words Record Highs"></p>
+
 # Record Highs
 
 *Your week in music, as a weather report.*
@@ -17,25 +19,26 @@ Built in Swift and SwiftUI for macOS 14 and later, with no dependencies. Apple M
 | `make test` | Runs the unit tests (vibe, layout, alt text, saving) |
 | `make check` | Builds, then checks the promises below |
 | `make samples` | Redraws the sample poster with placeholder covers |
-| `make icon` | Redraws `AppIcon.icns` |
+| `make icon` | Redraws `AppIcon.icns` from `assets/icon.svg` (needs `rsvg-convert`) |
 
 ## Using it
 
-- **Fill from your week.** Press **Fill** and the empty slots take your most played tracks in Apple Music over the last 7 days, then your Shazams (if Shazam saves to Apple Music). Library tracks only, and nothing leaves your Mac.
-- **Add six songs.** Type a title and artist, drag a cover onto the slot, press **Use Apple Music** to take the track that's playing, or press **Find cover** (off until you turn it on).
-- **Set the weight.** Heavier songs get a thicker frame.
+- **Start from Apple Music.** At the top, **Fill from my week** fills the empty slots with your most played tracks of the last 7 days, then your Shazams (if Shazam saves to Apple Music). **Add now playing** puts the current track in the first empty slot. Library tracks only, and nothing leaves your Mac.
+- **Paste a list.** One song per line, as `Title - Artist` or `Title by Artist`, numbered or not. It works from any source, including a Shazam history or a Buffer caption from an earlier week, and nothing leaves your Mac. Apple Music only logs plays of songs in your library, so this is the way in for streamed songs.
+- **Or add songs by hand.** Type a title and artist and drag a cover onto the slot, or turn on **Find cover** in Settings.
 - **Read the vibe.** A one-line forecast such as "Overcast and dreamy, 70% chance of staring out of windows." Type over it, or press **Regenerate** for another.
 - **Post it.** Choose a save folder once and the PNG saves itself after each change. **Open Buffer** copies the post text and opens Buffer in your browser; **Copy alt text** gives you an image description that covers every word on the poster.
 
-Everything you enter is saved as you go, so quitting loses nothing.
+Everything you enter is saved as you go, so quitting loses nothing. **Clear all songs** starts the six slots afresh (with one Undo); the week, dates and your name stay.
 
 ## Layout
 
 - `Sources/RecordCore/` - the parts with no UI: vibe forecast, grid layout, post text, alt text
-- `Sources/RecordCore/Style.swift` - frame colour and the genre-to-weather table; edit this to change the wording
+- `Sources/RecordCore/Style.swift` - frame colour and thickness, and the genre-to-weather table; edit this to change the wording
 - `Sources/RecordHighs/` - the app: editor, poster, Apple Music, cover lookup, export
 - `Tests/RecordCoreTests/` - unit tests
 - `scripts/check-promises.sh` - the promise checks
+- `assets/` - the logo and app icon (SVG); the lettering is outlined from Jost, which is under the SIL Open Font License
 - `samples/` - the sample poster
 
 ## Promises

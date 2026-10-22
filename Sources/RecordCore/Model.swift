@@ -13,7 +13,6 @@ public struct Song: Identifiable, Codable, Equatable {
     public var id = UUID()
     public var title = "", artist = "", genre = ""   // genre feeds the vibe; not shown in the editor
     public var album: String?        // from Find cover or Apple Music; used in alt text. Optional so older saves still load.
-    public var weight = 0.5          // 0...1
     public var cover: Data?          // image bytes; saved with the week, never uploaded
     public init() {}
 }
@@ -26,6 +25,11 @@ public struct Week: Codable, Equatable {
     public init(label: String, dates: String, songs: [Song] = (0..<6).map { _ in Song() }) {
         self.label = label; self.dates = dates; self.songs = songs
     }
+}
+
+/// The same week with all six songs and the vibe cleared; the week label, dates and name stay.
+public func cleared(_ week: Week) -> Week {
+    Week(label: week.label, dates: week.dates)
 }
 
 /// The post text copied for Buffer: the week, the songs, then the vibe. Songs without a title are skipped.
@@ -47,18 +51,15 @@ public func altText(for week: Week, name: String) -> String {
             "\(i + 1). \(s.title)" + (s.artist.isEmpty ? "" : " by \(s.artist)")
                 + ((s.album ?? "").isEmpty ? "." : ", cover of the album \(s.album!).")
         }
-        // Name a song of the week only when one frame is clearly the thickest, not a nudge of the slider.
-        let byWeight = songs.sorted { $0.weight > $1.weight }, top = byWeight[0]
-        if byWeight.count > 1, top.weight - byWeight[1].weight >= 0.1 { parts.append("The thickest frame is around \(top.title), the song of the week.") }
     }
     return parts.joined(separator: " ")
 }
 
-/// One-sentence forecast from the songs' genres and weights. Nil until a known genre is present.
+/// One-sentence forecast from the songs' genres, each song counting once. Nil until a known genre is present.
 /// `seed` 0 is the plain reading; Regenerate bumps it to vary the wording and which genres speak.
 public func vibe(for songs: [Song], seed: Int = 0) -> String? {
     var totals: [String: Double] = [:]
-    for s in songs where weather[s.genre] != nil { totals[s.genre, default: 0] += max(s.weight, 0.05) }
+    for s in songs where weather[s.genre] != nil { totals[s.genre, default: 0] += 1 }
     let ranked = totals.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.compactMap { weather[$0.key] }
     guard let top = ranked.first else { return nil }
     let others = Array(ranked.dropFirst()), n = max(seed, 0)
@@ -86,5 +87,3 @@ public func fileStem(for label: String) -> String {
     return stem.isEmpty ? "record-highs" : String(stem.prefix(60))
 }
 
-/// Frame thickness in points: 2pt at weight 0, 14pt at weight 1.
-public func frameWidth(weight: Double) -> Double { 2 + 12 * min(max(weight, 0), 1) }

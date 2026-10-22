@@ -10,7 +10,7 @@ import RecordCore
     static func render(into dir: URL) {
         let songs = tracks.enumerated().map { i, t -> Song in
             var s = Song(); s.title = t.0; s.artist = t.1
-            s.weight = Double(i) / 5; s.genre = ["Alternative", "Pop", "Alternative", "Electronica", "Pop", "Soundtrack"][i]
+            s.genre = ["Alternative", "Pop", "Alternative", "Electronica", "Pop", "Soundtrack"][i]
             let r = ImageRenderer(content: Color(hue: Double(i) / 6, saturation: 0.25, brightness: 0.75).frame(width: 300, height: 300))
             s.cover = r.cgImage.flatMap { NSBitmapImageRep(cgImage: $0).representation(using: .png, properties: [:]) }
             return s

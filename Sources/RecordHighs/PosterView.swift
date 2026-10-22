@@ -3,23 +3,24 @@ import RecordCore
 
 struct PosterView: View {
     let songs: [Song], week: String, dates: String, name: String, vibe: String?, size: PosterSize
+    var ground: String = backgroundHex   // the flat background colour
 
     var body: some View {
         let (header, cells) = gridLayout(size)
         ZStack(alignment: .topLeading) {
-            Color(white: 0.97)
+            { let c = colour(hex: ground); return Color(red: c.r, green: c.g, blue: c.b) }()
             VStack(alignment: .leading, spacing: 6) {
                 Text("RECORD HIGHS").font(.system(size: 26, weight: .semibold)).kerning(4).foregroundStyle(.secondary)
                 Text(week).font(.system(size: size == .portrait ? 64 : 52, weight: .bold))
                 Text(name.isEmpty ? dates : "\(dates) · \(name)").font(.system(size: 26)).foregroundStyle(.secondary)
-                if let v = vibe { Text("Vibe: \(v)").font(.system(size: 24).italic()).lineLimit(2).fixedSize(horizontal: false, vertical: true) }
+                if let v = vibe { Text("Vibe: \(v)").font(.system(size: 30).italic()).lineLimit(3).fixedSize(horizontal: false, vertical: true) }
             }
             .frame(width: header.width, height: header.height, alignment: .bottomLeading)
             .offset(x: header.minX, y: header.minY)
             ForEach(Array(zip(songs.prefix(6), cells)), id: \.0.id) { song, cell in
                 let c = colour(hex: frameHex)
                 cover(song).frame(width: cell.cover.width, height: cell.cover.height).clipped()
-                    .overlay(Rectangle().strokeBorder(Color(red: c.r, green: c.g, blue: c.b), lineWidth: frameWidth(weight: song.weight)))
+                    .overlay(Rectangle().strokeBorder(Color(red: c.r, green: c.g, blue: c.b), lineWidth: frameWidth))
                     .offset(x: cell.cover.minX, y: cell.cover.minY)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title).font(.system(size: 24, weight: .semibold)).lineLimit(2)

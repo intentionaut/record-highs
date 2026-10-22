@@ -2,14 +2,19 @@ import SwiftUI
 import RecordCore
 
 enum Export {
-    /// Renders the 1080x1350 poster at 1x and writes one PNG into `folder`.
-    @MainActor static func write(_ poster: PosterView, to folder: URL, stem: String) throws -> URL {
-        let r = ImageRenderer(content: poster); r.scale = 1
+    /// Renders any view at 1x and writes it as a PNG at `url`. The only place the app writes an image.
+    @MainActor static func save<V: View>(_ view: V, to url: URL) throws {
+        let r = ImageRenderer(content: view); r.scale = 1
         guard let cg = r.cgImage,
               let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
-        else { throw PlayerError(errorDescription: "Couldn't render the poster.") }
-        let url = folder.appendingPathComponent("\(stem).png")
+        else { throw PlayerError(errorDescription: "Couldn't render the image.") }
         try png.write(to: url)
+    }
+
+    /// Renders the 1080x1350 poster and writes one PNG into `folder`.
+    @MainActor static func write(_ poster: PosterView, to folder: URL, stem: String) throws -> URL {
+        let url = folder.appendingPathComponent("\(stem).png")
+        try save(poster, to: url)
         return url
     }
 

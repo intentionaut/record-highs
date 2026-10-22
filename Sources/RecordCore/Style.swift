@@ -1,5 +1,9 @@
-// The poster's frame colour. Edit this file to change it.
+// The poster's cover frames: one colour and one thickness for every song. Edit this file to change them.
 public let frameHex = "#1F1F1F"
+public let frameWidth = 8.0   // points
+
+// The poster background: one flat colour, kept simple so the covers stand out.
+public let backgroundHex = "#F7F7F7"
 
 // The vibe forecast. Each genre (as iTunes names it) gives a sky, a feel and an activity.
 // The heaviest genre sets the sky and activity, the next sets the feel. Edit freely.

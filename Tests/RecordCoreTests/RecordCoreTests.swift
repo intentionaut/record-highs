@@ -10,9 +10,6 @@ final class ColourTests: XCTestCase {
     func testMalformedFallsBackToGrey() {
         for bad in ["", "E4572E", "#E4572", "#GGGGGG"] { XCTAssertEqual(colour(hex: bad), RGB(r: 0.5, g: 0.5, b: 0.5), bad) }
     }
-    func testFrameWidthClamps() {
-        XCTAssertEqual(frameWidth(weight: -1), 2); XCTAssertEqual(frameWidth(weight: 2), 14); XCTAssertEqual(frameWidth(weight: 0.5), 8)
-    }
 }
 
 final class LayoutTests: XCTestCase {
@@ -41,7 +38,7 @@ final class WeekTests: XCTestCase {
     func testRoundTripKeepsEverything() throws {
         var w = Week(label: "Week 43", dates: "19 – 25 Oct")
         w.songs[0].title = "Nude"; w.songs[0].artist = "Radiohead"; w.songs[0].genre = "Alternative"
-        w.songs[0].weight = 0.9; w.songs[0].cover = Data([1, 2, 3])
+        w.songs[0].cover = Data([1, 2, 3])
         XCTAssertEqual(try JSONDecoder().decode(Week.self, from: JSONEncoder().encode(w)), w)
     }
     func testCaptionSkipsEmptySongsAndHasNoEmDash() {
@@ -53,31 +50,31 @@ final class WeekTests: XCTestCase {
 }
 
 final class VibeTests: XCTestCase {
-    func song(_ g: String, _ w: Double) -> Song { var s = Song(); s.genre = g; s.weight = w; return s }
+    func song(_ g: String) -> Song { var s = Song(); s.genre = g; return s }
     func testThisWeek() {
-        let week = [song("Pop", 0.5), song("Alternative", 0.5), song("Pop", 0.48),
-                    song("Alternative", 0.5), song("Electronica", 0.5), song("Soundtrack", 0.5)]
+        let week = [song("Pop"), song("Alternative"), song("Pop"),
+                    song("Alternative"), song("Electronica"), song("Soundtrack")]
         XCTAssertEqual(vibe(for: week), "Overcast and dreamy, 70% chance of staring out of windows.")
     }
-    func testSingleGenreUsesItsOwnFeel() { XCTAssertEqual(vibe(for: [song("Jazz", 1)]), "Low cloud and smoky, 100% chance of lingering over coffee.") }
-    func testNoKnownGenreGivesNoVibe() { XCTAssertNil(vibe(for: [song("", 1), song("Polka", 1)])) }
+    func testSingleGenreUsesItsOwnFeel() { XCTAssertEqual(vibe(for: [song("Jazz")]), "Low cloud and smoky, 100% chance of lingering over coffee.") }
+    func testNoKnownGenreGivesNoVibe() { XCTAssertNil(vibe(for: [song(""), song("Polka")])) }
     func testOneSentenceNoEmDash() {
-        for g in weather.keys { let v = vibe(for: [song(g, 1)])!; XCTAssertFalse(v.contains("—")); XCTAssertEqual(v.filter { $0 == "." }.count, 1, g) }
+        for g in weather.keys { let v = vibe(for: [song(g)])!; XCTAssertFalse(v.contains("—")); XCTAssertEqual(v.filter { $0 == "." }.count, 1, g) }
     }
 }
 
 final class AltTextTests: XCTestCase {
     func week() -> Week {
         var w = Week(label: "Week 43", dates: "19 Oct – 25 Oct")
-        let rows = [("teeth", "mallrat", "Pop", 0.5), ("Horses", "Mallrat", "Alternative", 0.9)]
-        for (i, r) in rows.enumerated() { w.songs[i].title = r.0; w.songs[i].artist = r.1; w.songs[i].genre = r.2; w.songs[i].weight = r.3 }
+        let rows = [("teeth", "mallrat", "Pop"), ("Horses", "Mallrat", "Alternative")]
+        for (i, r) in rows.enumerated() { w.songs[i].title = r.0; w.songs[i].artist = r.1; w.songs[i].genre = r.2 }
         w.songs[1].album = "Butterfly Blue"
         return w
     }
     func testCoversEveryWordOnThePoster() {
         let alt = altText(for: week(), name: "Elle")
         for word in ["Record Highs", "Week 43", "19 Oct – 25 Oct", "Elle", "Vibe: " + vibeLine(for: week())!,
-                     "1. teeth by mallrat.", "2. Horses by Mallrat, cover of the album Butterfly Blue.", "thickest frame is around Horses"] {
+                     "1. teeth by mallrat.", "2. Horses by Mallrat, cover of the album Butterfly Blue."] {
             XCTAssertTrue(alt.contains(word), word)
         }
         XCTAssertFalse(alt.contains("—"))
@@ -94,19 +91,12 @@ final class AltTextTests: XCTestCase {
     }
 }
 
-final class SongOfTheWeekTests: XCTestCase {
-    func testNearTieNamesNoSong() {
-        var w = Week(label: "W", dates: "d")
-        for i in 0..<3 { w.songs[i].title = "s\(i)"; w.songs[i].weight = i == 2 ? 0.48 : 0.5 }
-        XCTAssertFalse(altText(for: w, name: "").contains("thickest"))
-    }
-}
 
 final class VibeEditTests: XCTestCase {
     func week() -> Week {
         var w = Week(label: "W", dates: "d")
         for (i, g) in ["Pop", "Alternative", "Pop", "Alternative", "Electronica", "Soundtrack"].enumerated() {
-            w.songs[i].title = "s\(i)"; w.songs[i].genre = g; w.songs[i].weight = i == 2 ? 0.48 : 0.5
+            w.songs[i].title = "s\(i)"; w.songs[i].genre = g
         }
         return w
     }
@@ -159,9 +149,55 @@ final class FillTests: XCTestCase {
         XCTAssertEqual(pickForWeek((0..<10).map { c("t\($0)", $0, ago: 1) }, existing: [], free: 2).count, 2)
         XCTAssertTrue(pickForWeek([c("t", 1, ago: 1)], existing: [], free: 0).isEmpty)
     }
-    func testWeightsRunThickToThin() {
-        XCTAssertEqual(weightForRank(0, of: 6), 0.8, accuracy: 1e-9)
-        XCTAssertEqual(weightForRank(5, of: 6), 0.2, accuracy: 1e-9)
-        XCTAssertEqual(weightForRank(0, of: 1), 0.8)
+}
+
+final class ClearTests: XCTestCase {
+    func testClearKeepsTheWeekAndEmptiesTheSongs() {
+        var w = Week(label: "Week 43", dates: "19 – 25 Oct")
+        w.songs[0].title = "teeth"; w.songs[0].cover = Data([1]); w.vibeOverride = "Mine"; w.vibeSeed = 3
+        let c = cleared(w)
+        XCTAssertEqual(c.label, "Week 43"); XCTAssertEqual(c.dates, "19 – 25 Oct")
+        XCTAssertEqual(c.songs.count, 6)
+        XCTAssertTrue(c.songs.allSatisfy { $0.title.isEmpty && $0.cover == nil })
+        XCTAssertNil(c.vibeOverride); XCTAssertNil(vibeLine(for: c))
+    }
+}
+
+final class FrameTests: XCTestCase {
+    func testOneFrameForEverySong() { XCTAssertEqual(frameWidth, 8); XCTAssertNotEqual(colour(hex: frameHex), RGB(r: 0.5, g: 0.5, b: 0.5)) }
+}
+
+final class ListParseTests: XCTestCase {
+    func p(_ s: String) -> [Listed] { parseSongList(s) }
+    func testDashByAndNumbering() {
+        XCTAssertEqual(p("teeth - mallrat"), [Listed(title: "teeth", artist: "mallrat")])
+        XCTAssertEqual(p("1. Horses by Mallrat"), [Listed(title: "Horses", artist: "Mallrat")])
+        XCTAssertEqual(p("• Air – Surfing on a Rocket"), [Listed(title: "Air", artist: "Surfing on a Rocket")])  // order is Title - Artist
+    }
+    func testLastSeparatorWins() {
+        XCTAssertEqual(p("Stand by Me - Ben E. King"), [Listed(title: "Stand by Me", artist: "Ben E. King")])
+        XCTAssertEqual(p("American Woman - David Lynch Remix by Muddy Magnolias"),
+                       [Listed(title: "American Woman - David Lynch Remix", artist: "Muddy Magnolias")])
+    }
+    func testBlankLinesQuotesAndTitleOnly() {
+        XCTAssertEqual(p("\n\n\"Nude\" - Radiohead\n\nJust a title\n"), [Listed(title: "Nude", artist: "Radiohead"), Listed(title: "Just a title", artist: "")])
+    }
+    func testBufferCaptionRoundTrips() {
+        var w = Week(label: "Week 43", dates: "d")
+        let rows = [("teeth", "mallrat"), ("Pedestrian at Best", "Courtney Barnett"), ("American Woman David Lynch Remix", "Muddy Mangolias")]
+        for (i, r) in rows.enumerated() { w.songs[i].title = r.0; w.songs[i].artist = r.1; w.songs[i].genre = "Pop" }
+        XCTAssertEqual(parseSongList(caption(for: w)), rows.map { Listed(title: $0.0, artist: $0.1) })
+    }
+    func testLimitAndLongLines() {
+        XCTAssertEqual(parseSongList((0..<30).map { "t\($0) - a" }.joined(separator: "\n")).count, 12)
+        XCTAssertLessThanOrEqual(p(String(repeating: "x", count: 500))[0].title.count, 120)
+    }
+    func testPlaceFillsEmptySlotsSkipsDuplicatesAndReportsNoRoom() {
+        var songs = (0..<6).map { _ in Song() }
+        songs[0].title = "Teeth"; songs[0].artist = "Mallrat"
+        let list = (["teeth - mallrat"] + (1...6).map { "s\($0) - a" }).map { parseSongList($0)[0] }
+        let r = place(list, into: songs)
+        XCTAssertEqual(r.added, 5); XCTAssertEqual(r.duplicates, 1); XCTAssertEqual(r.noRoom, 1)
+        XCTAssertEqual(r.songs.map(\.title), ["Teeth", "s1", "s2", "s3", "s4", "s5"])
     }
 }

@@ -22,19 +22,37 @@ struct EditorView: View {
     @AppStorage("lookupEnabled") private var lookupEnabled = false
     @AppStorage("exportFolder") private var folderBookmark = Data()
     @State private var status = ""
-    @State private var edits = 0             // bumps on every change; the PNG autosaves a moment after the last one
+    @State private var edits = 0
+    @State private var confirmClear = false
+    @State private var showPaste = false
+    @State private var pasted = ""
+    @State private var beforeClear: Week?     // one level of undo for Clear all             // bumps on every change; the PNG autosaves a moment after the last one
     private let player: PlayerSource = AppleMusicSource()
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             Form {
+                Section {
+                    HStack {
+                        Button("Fill from my week", action: fillFromWeek).buttonStyle(.borderedProminent)
+                            .disabled(!hasEmptySlot)
+                            .accessibilityHint("Fills the empty song slots from what you played this week. Nothing leaves your Mac.")
+                        Button("Add now playing", action: addNowPlaying).disabled(!hasEmptySlot)
+                            .accessibilityHint("Puts the track playing in \(player.name) into the first empty slot")
+                        Button("Paste a list…") { showPaste = true }.disabled(!hasEmptySlot)
+                            .accessibilityHint("Opens a box to paste song titles and artists, one per line")
+                    }
+                } header: { Text("Add songs") } footer: {
+                    Text("\(player.name) only logs plays of songs in your library, so for streamed songs or Shazams use Paste a list. Only empty slots are filled, and nothing leaves your Mac.")
+                }
+                ForEach(w.songs.indices, id: \.self) { i in slot($w.songs[i], number: i + 1) }
                 Section("Poster") {
                     TextField("Week", text: $w.label, prompt: Text("Week 43"))
                     TextField("Dates", text: $w.dates, prompt: Text("19 – 25 Oct"))
                     TextField("Your name", text: $name, prompt: Text("Optional"))
                     VStack(alignment: .leading, spacing: 6) {
                         TextField("Vibe", text: Binding(get: { vibeLine(for: w) ?? "" }, set: { w.vibeOverride = $0 }),
-                                  prompt: Text("Add songs from Find cover or Apple Music for a forecast"), axis: .vertical)
+                                  prompt: Text("Add songs for a forecast"), axis: .vertical)
                             .lineLimit(1...3)
                         HStack {
                             Text(w.vibeOverride == nil ? "Forecast from your songs" : "Your words").font(.caption).foregroundStyle(.secondary)
@@ -43,22 +61,26 @@ struct EditorView: View {
                                 .controlSize(.small).accessibilityHint("Replaces the vibe line with a new forecast from your songs")
                         }
                     }
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Fill from my week")
-                            Text("Empty slots only: your most played in \(player.name) over the last 7 days, then your Shazams.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Fill", action: fillFromWeek).disabled(!w.songs.contains { $0.title.isEmpty })
-                            .accessibilityHint("Fills the empty song slots from what you played this week. Nothing leaves your Mac.")
-                    }
+                }
+                Section("Settings") {
                     Toggle(isOn: $lookupEnabled) {
                         Text("Allow Find cover")
-                        Text("Sends title and artist to the iTunes Search API, once per press.")
+                        Text("Sends a song's title and artist to the iTunes Search API, once per press.")
+                    }
+                    HStack {
+                        Button("Clear all songs…", role: .destructive) { confirmClear = true }
+                            .disabled(w.songs.allSatisfy { $0.title.isEmpty && $0.cover == nil })
+                        Spacer()
+                        if let before = beforeClear {
+                            Button("Undo clear") { w = before; beforeClear = nil; status = "Songs restored." }
+                        }
                     }
                 }
-                ForEach(w.songs.indices, id: \.self) { i in slot($w.songs[i], number: i + 1) }
+                .confirmationDialog("Clear all six songs?", isPresented: $confirmClear) {
+                    Button("Clear all songs", role: .destructive) {
+                        beforeClear = w; w = cleared(w); status = "Cleared. Press Undo clear to bring them back."
+                    }
+                } message: { Text("Titles, artists, covers and your vibe line go. The week, dates and your name stay.") }
             }
             .formStyle(.grouped).frame(width: 420)
             VStack(spacing: 12) {
@@ -78,6 +100,7 @@ struct EditorView: View {
             .padding(20).frame(width: 1080 * 0.45 + 40)
         }
         .frame(minHeight: 1350 * 0.45 + 80)
+        .sheet(isPresented: $showPaste) { pasteSheet }
         .onChange(of: w) { Store.save(w); edits += 1 }
         .onChange(of: name) { edits += 1 }
         .task(id: edits) {
@@ -107,16 +130,50 @@ struct EditorView: View {
                 }
                 .textFieldStyle(.roundedBorder)
             }
-            HStack {
-                Slider(value: song.weight, in: 0...1) { Text("Weight") }
+            if lookupEnabled {
+                HStack {
+                    Spacer()
+                    Button("Find cover") { find(song) }.disabled(song.wrappedValue.title.isEmpty).controlSize(.small)
+                }
             }
+        }
+    }
+
+    var pasteSheet: some View {
+        let found = parseSongList(pasted).count, free = w.songs.filter { $0.title.isEmpty }.count
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Paste a list").font(.headline)
+            Text("One song per line, as Title - Artist or Title by Artist. Numbers are fine. Only empty slots are filled.")
+                .font(.callout).foregroundStyle(.secondary)
+            TextEditor(text: $pasted).font(.body).frame(minHeight: 170)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
+                .accessibilityLabel("Songs to add, one per line")
+            Text("\(count(found, "song")) found, \(count(free, "empty slot"))").font(.caption).foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("Use \(player.name)") { fromPlayer(song) }.accessibilityHint("Fills this song from the track playing in \(player.name)")
-                Button("Find cover") { find(song) }.disabled(!lookupEnabled || song.wrappedValue.title.isEmpty)
+                Button("Cancel") { showPaste = false; pasted = "" }.keyboardShortcut(.cancelAction)
+                Button("Add songs", action: addPasted).keyboardShortcut(.defaultAction).disabled(found == 0)
             }
-            .controlSize(.small)
         }
+        .padding(20).frame(width: 440)
+    }
+
+    func count(_ n: Int, _ noun: String) -> String { "\(n) \(noun)\(n == 1 ? "" : "s")" }
+
+    func addPasted() {
+        let r = place(parseSongList(pasted), into: w.songs)
+        w.songs = r.songs
+        status = "Added \(count(r.added, "song"))." + (r.duplicates > 0 ? " \(r.duplicates) already on the week." : "")
+            + (r.noRoom > 0 ? " \(r.noRoom) didn't fit." : "")
+            + (lookupEnabled ? " Press Find cover on each for artwork." : " Drop images on the slots, or turn on Find cover in Settings.")
+        pasted = ""; showPaste = false
+    }
+
+    var hasEmptySlot: Bool { w.songs.contains { $0.title.isEmpty } }
+
+    func addNowPlaying() {
+        guard let i = w.songs.firstIndex(where: { $0.title.isEmpty }) else { return }
+        fromPlayer($w.songs[i])
     }
 
     func fromPlayer(_ song: Binding<Song>) {
@@ -133,15 +190,17 @@ struct EditorView: View {
         do {
             let empty = w.songs.indices.filter { w.songs[$0].title.isEmpty }
             let picks = pickForWeek(try player.recent(since: .now.addingTimeInterval(-7 * 86_400)), existing: w.songs, free: empty.count)
-            for (rank, (slot, pick)) in zip(empty, picks).enumerated() {
+            for (slot, pick) in zip(empty, picks) {
                 w.songs[slot].title = pick.title; w.songs[slot].artist = pick.artist
                 w.songs[slot].album = pick.album; w.songs[slot].genre = pick.genre
-                w.songs[slot].weight = weightForRank(rank, of: picks.count)
                 w.songs[slot].cover = player.artwork(id: pick.id)
             }
             let shazams = picks.filter { $0.source == .shazam }.count
-            status = picks.isEmpty ? "Nothing new played in \(player.name) this week."
-                : "Filled \(picks.count) from \(player.name)" + (shazams > 0 ? ", \(shazams) from Shazam." : ".")
+            let latest = picks.filter { $0.source == .played }.map(\.when).max()
+            let day = DateFormatter(); day.dateFormat = "d MMM"
+            status = picks.isEmpty ? "Nothing new in \(player.name) this week. It only logs songs in your library, so try Paste a list."
+                : "Filled \(picks.count) from \(player.name)" + (latest.map { " (latest play \(day.string(from: $0)))" } ?? "")
+                + (shazams > 0 ? ", \(shazams) from Shazam" : "") + "."
         } catch { status = error.localizedDescription }
     }
 

@@ -19,12 +19,11 @@ samples:
 check: app
 	scripts/check-promises.sh
 
-icon:
+icon:   # redraws AppIcon.icns from assets/icon.svg; needs rsvg-convert (brew install librsvg)
 	rm -rf build/AppIcon.iconset && mkdir -p build/AppIcon.iconset
-	swift scripts/make-icon.swift build/icon-1024.png
 	for s in 16 32 128 256 512; do \
-	  sips -z $$s $$s build/icon-1024.png --out build/AppIcon.iconset/icon_$${s}x$${s}.png >/dev/null; \
-	  sips -z $$((s*2)) $$((s*2)) build/icon-1024.png --out build/AppIcon.iconset/icon_$${s}x$${s}@2x.png >/dev/null; done
+	  rsvg-convert -w $$s -h $$s assets/icon.svg -o build/AppIcon.iconset/icon_$${s}x$${s}.png; \
+	  rsvg-convert -w $$((s*2)) -h $$((s*2)) assets/icon.svg -o build/AppIcon.iconset/icon_$${s}x$${s}@2x.png; done
 	iconutil -c icns build/AppIcon.iconset -o AppIcon.icns
 
 install: app
