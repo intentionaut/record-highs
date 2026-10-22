@@ -165,6 +165,7 @@ final class ClearTests: XCTestCase {
 
 final class FrameTests: XCTestCase {
     func testOneFrameForEverySong() { XCTAssertEqual(frameWidth, 8); XCTAssertNotEqual(colour(hex: frameHex), RGB(r: 0.5, g: 0.5, b: 0.5)) }
+    func testBackgroundIsAValidColour() { XCTAssertNotEqual(colour(hex: backgroundHex), RGB(r: 0.5, g: 0.5, b: 0.5)) }
 }
 
 final class ListParseTests: XCTestCase {

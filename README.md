@@ -34,7 +34,7 @@ Everything you enter is saved as you go, so quitting loses nothing. **Clear all 
 ## Layout
 
 - `Sources/RecordCore/` - the parts with no UI: vibe forecast, grid layout, post text, alt text
-- `Sources/RecordCore/Style.swift` - frame colour and thickness, and the genre-to-weather table; edit this to change the wording
+- `Sources/RecordCore/Style.swift` - background and frame colours, frame thickness, and the genre-to-weather table; edit this to change the wording
 - `Sources/RecordHighs/` - the app: editor, poster, Apple Music, cover lookup, export
 - `Tests/RecordCoreTests/` - unit tests
 - `scripts/check-promises.sh` - the promise checks
