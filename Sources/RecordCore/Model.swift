@@ -55,29 +55,10 @@ public func altText(for week: Week, name: String) -> String {
     return parts.joined(separator: " ")
 }
 
-/// One-sentence forecast from the songs' genres, each song counting once. Nil until a known genre is present.
-/// `seed` 0 is the plain reading; Regenerate bumps it to vary the wording and which genres speak.
-public func vibe(for songs: [Song], seed: Int = 0) -> String? {
-    var totals: [String: Double] = [:]
-    for s in songs where weather[s.genre] != nil { totals[s.genre, default: 0] += 1 }
-    let ranked = totals.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.compactMap { weather[$0.key] }
-    guard let top = ranked.first else { return nil }
-    let others = Array(ranked.dropFirst()), n = max(seed, 0)
-    let feel = others.isEmpty ? top.feel : others[(n / 3) % others.count].feel
-    let activity = (n / 6) % 2 == 1 && !others.isEmpty ? others[0].activity : top.activity
-    let topTwo = totals.values.sorted(by: >).prefix(2).reduce(0, +)
-    let chance = Int((topTwo / totals.values.reduce(0, +) * 10).rounded()) * 10
-    switch n % 3 {
-    case 1:  return "\(top.sky) skies turning \(feel), with a \(chance)% chance of \(activity)."
-    case 2:  return "Mostly \(top.sky.lowercased()), \(feel) later on, \(chance)% chance of \(activity)."
-    default: return "\(top.sky) and \(feel), \(chance)% chance of \(activity)."
-    }
-}
-
 /// The vibe as it appears everywhere: your own words if you've edited it, otherwise the forecast.
 public func vibeLine(for week: Week) -> String? {
     if let own = week.vibeOverride?.trimmingCharacters(in: .whitespacesAndNewlines), !own.isEmpty { return own }
-    return vibe(for: week.songs, seed: week.vibeSeed ?? 0)
+    return vibe(for: week.songs, seed: week.vibeSeed ?? 0, key: week.label + "|" + week.dates)
 }
 
 /// A safe file name from the week label: lowercase letters, digits and single dashes, nothing that can climb out of a folder.

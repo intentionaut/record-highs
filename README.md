@@ -26,7 +26,7 @@ Built in Swift and SwiftUI for macOS 14 and later, with no dependencies. Apple M
 - **Start from Apple Music.** At the top, **Fill from my week** fills the empty slots with your most played tracks of the last 7 days, then your Shazams (if Shazam saves to Apple Music). **Add now playing** puts the current track in the first empty slot. Library tracks only, and nothing leaves your Mac.
 - **Paste a list.** One song per line, as `Title - Artist` or `Title by Artist`, numbered or not. It works from any source, including a Shazam history or a Buffer caption from an earlier week, and nothing leaves your Mac. Apple Music only logs plays of songs in your library, so this is the way in for streamed songs.
 - **Or add songs by hand.** Type a title and artist and drag a cover onto the slot, or turn on **Find cover** in Settings.
-- **Read the vibe.** A one-line forecast such as "Overcast and dreamy, 70% chance of staring out of windows." Type over it, or press **Regenerate** for another.
+- **Read the vibe.** A one-line forecast worked out from your songs' genres, such as "Mostly overcast, brooding later on, 70% chance of staring out of windows." The 109 genre names Apple Music uses are grouped into 18 families, each with its own skies, feelings and activities, and the wording changes from week to week. A week with five genres reads "changeable", an artist who appears twice can get named, and the chance is out of all your songs, so a song without a genre lowers it. Type over the line, or press **Regenerate** for another; there are hundreds of combinations.
 - **Post it.** Choose a save folder once and the PNG saves itself after each change. **Open Buffer** copies the post text and opens Buffer in your browser; **Copy alt text** gives you an image description that covers every word on the poster.
 
 Everything you enter is saved as you go, so quitting loses nothing. **Clear all songs** starts the six slots afresh (with one Undo); the week, dates and your name stay.
@@ -34,7 +34,8 @@ Everything you enter is saved as you go, so quitting loses nothing. **Clear all 
 ## Layout
 
 - `Sources/RecordCore/` - the parts with no UI: vibe forecast, grid layout, post text, alt text
-- `Sources/RecordCore/Style.swift` - background and frame colours, frame thickness, and the genre-to-weather table; edit this to change the wording
+- `Sources/RecordCore/Style.swift` - background and frame colours, frame thickness, and the weather words for each genre family; edit this to change the wording
+- `Sources/RecordCore/Forecast.swift` - how a week becomes a forecast: the sentence shapes and the stable choice of words
 - `Sources/RecordHighs/` - the app: editor, poster, Apple Music, cover lookup, export
 - `Tests/RecordCoreTests/` - unit tests
 - `scripts/check-promises.sh` - the promise checks

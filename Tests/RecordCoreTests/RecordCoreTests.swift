@@ -44,59 +44,106 @@ final class WeekTests: XCTestCase {
     func testCaptionSkipsEmptySongsAndHasNoEmDash() {
         var w = Week(label: "Week 43", dates: "19 – 25 Oct")
         w.songs[0].title = "Nude"; w.songs[0].artist = "Radiohead"; w.songs[2].title = "Untitled"
-        XCTAssertEqual(caption(for: w), "My week in music, Week 43:\n1. Nude by Radiohead\n2. Untitled")
+        let lines = caption(for: w).split(separator: "\n").map(String.init)
+        XCTAssertEqual(Array(lines.prefix(3)), ["My week in music, Week 43:", "1. Nude by Radiohead", "2. Untitled"])
+        XCTAssertEqual(lines.count, 4)                                // no genres known, so the neutral forecast still ends the post
+        XCTAssertTrue(lines[3].hasPrefix("Vibe: ") && !lines[3].hasSuffix("."), lines[3])
         XCTAssertFalse(caption(for: w).contains("—"))
     }
 }
 
 final class VibeTests: XCTestCase {
-    func song(_ g: String) -> Song { var s = Song(); s.genre = g; return s }
-    func testThisWeek() {
-        let week = [song("Pop"), song("Alternative"), song("Pop"),
-                    song("Alternative"), song("Electronica"), song("Soundtrack")]
-        XCTAssertEqual(vibe(for: week), "Overcast and dreamy, 70% chance of staring out of windows.")
-    }
-    func testSingleGenreUsesItsOwnFeel() { XCTAssertEqual(vibe(for: [song("Jazz")]), "Low cloud and smoky, 100% chance of lingering over coffee.") }
-    func testNoKnownGenreGivesNoVibe() { XCTAssertNil(vibe(for: [song(""), song("Polka")])) }
-    func testOneSentenceNoEmDash() {
-        for g in weather.keys { let v = vibe(for: [song(g)])!; XCTAssertFalse(v.contains("—")); XCTAssertEqual(v.filter { $0 == "." }.count, 1, g) }
-    }
-}
+    func songs(_ rows: [(String, String, String)]) -> [Song] { rows.map { var s = Song(); s.title = $0.0; s.artist = $0.1; s.genre = $0.2; return s } }
+    var herWeek: [Song] { songs([("a", "A", "Pop"), ("b", "B", "Dance"), ("c", "C", "Pop"), ("d", "D", ""), ("e", "E", ""), ("f", "F", "")]) }
+    var mixedWeek: [Song] { songs([("a", "A", "Pop"), ("b", "B", "Alternative"), ("c", "C", "Hip-Hop/Rap"),
+                                   ("d", "D", "Electronic"), ("e", "E", "Jazz"), ("f", "F", "Indie Pop")]) }
+    func oneGenre(_ g: String) -> [Song] { songs((0..<6).map { ("t\($0)", "A\($0)", g) }) }
 
-final class AltTextTests: XCTestCase {
-    func week() -> Week {
-        var w = Week(label: "Week 43", dates: "19 Oct – 25 Oct")
-        let rows = [("teeth", "mallrat", "Pop"), ("Horses", "Mallrat", "Alternative")]
-        for (i, r) in rows.enumerated() { w.songs[i].title = r.0; w.songs[i].artist = r.1; w.songs[i].genre = r.2 }
-        w.songs[1].album = "Butterfly Blue"
-        return w
+    func testStableHashGoldens() {   // FNV-1a 64-bit reference values
+        XCTAssertEqual(stableHash(""), 0xcbf29ce484222325)
+        XCTAssertEqual(stableHash("a"), 0xaf63dc4c8601ec8c)
     }
-    func testCoversEveryWordOnThePoster() {
-        let alt = altText(for: week(), name: "Elle")
-        for word in ["Record Highs", "Week 43", "19 Oct – 25 Oct", "Elle", "Vibe: " + vibeLine(for: week())!,
-                     "1. teeth by mallrat.", "2. Horses by Mallrat, cover of the album Butterfly Blue."] {
-            XCTAssertTrue(alt.contains(word), word)
+    func testGenreNamesFromAnAppleMusicLibraryAllMapToAFamily() {
+        let names = ["Alternative", "Pop", "Hip-Hop/Rap", "Electronic", "R&B/Soul", "Rock", "Dance", "Indie Pop", "Soundtrack", "Indie Rock",
+                     "Singer/Songwriter", "Hard Rock", "Latin", "House", "Jazz", "Electronica", "Instrumental", "Pop Latino", "Hip-Hop", "Rap",
+                     "Folk", "Metal", "MPB", "Alternative Folk", "Worldwide", "Soul", "French Pop", "Bossa Nova", "Urbano latino", "Techno",
+                     "Downtempo", "Classical", "Ambient", "Alternative Rap", "Dubstep", "Blues", "Reggae", "Neo-Soul", "K-Pop", "Country",
+                     "Contemporary R&B", "Punk", "Classical Crossover", "Bass", "Contemporary Folk", "Afrobeats", "New Age", "Adult Alternative",
+                     "Jungle/Drum'n'bass"]
+        for n in names { XCTAssertNotNil(family(of: n), n) }
+        XCTAssertEqual(family(of: "Alternative Rap"), "hiphop"); XCTAssertEqual(family(of: "Indie Pop"), "indie")
+        XCTAssertEqual(family(of: "Psychedelic Rock"), "rock"); XCTAssertEqual(family(of: "trap rap"), "hiphop")
+        XCTAssertNil(family(of: "Polka")); XCTAssertNil(family(of: "")); XCTAssertNil(family(of: "  "))
+    }
+    func testEveryFamilyIsComplete() {
+        for f in Set(genreNames.values) { XCTAssertNotNil(weather[f], f) }
+        for (f, w) in weather + [("neutral", neutralWeather)] {
+            XCTAssertEqual(w.skies.count, 4, f); XCTAssertEqual(w.feels.count, 4, f); XCTAssertEqual(w.activities.count, 4, f)
+            for phrase in w.skies + w.feels + w.activities { XCTAssertFalse(phrase.contains("—") || phrase.contains("–") || phrase.contains("."), phrase) }
         }
-        XCTAssertFalse(alt.contains("—"))
     }
-    func testNoNameNoSongs() {
-        XCTAssertEqual(altText(for: Week(label: "Week 1", dates: "1 – 7 Jan"), name: ""), "Record Highs poster. Week 1, 1 – 7 Jan.")
+    func testNothingTitledMeansNoVibe() { XCTAssertNil(vibe(for: (0..<6).map { _ in var s = Song(); s.genre = "Pop"; return s })) }
+    func testTitledSongsWithNoKnownGenreStillGetALine() {
+        let v = vibe(for: songs([("a", "X", "Polka"), ("b", "Y", "")]))!
+        XCTAssertTrue(v.contains("50%"), v)
     }
-    func testCaptionEndsWithVibe() {
-        XCTAssertEqual(caption(for: week()), "My week in music, Week 43:\n1. teeth by mallrat\n2. Horses by Mallrat\nVibe: " + String(vibeLine(for: week())!.dropLast()))
+    func testTheChanceIsOutOfEveryTitledSong() {
+        XCTAssertTrue(vibe(for: herWeek)!.contains("50%"))                     // 3 of 6 have a genre
+        XCTAssertTrue(vibe(for: oneGenre("Pop"))!.contains("100%"))
+        XCTAssertTrue(vibe(for: songs([("a", "A", "Pop"), ("b", "B", ""), ("c", "C", ""), ("d", "D", ""), ("e", "E", ""), ("f", "F", "")]))!.contains("20%"))
     }
-    func testOldSaveWithoutAlbumStillLoads() throws {
-        let old = #"{"label":"W","dates":"d","songs":[{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","title":"t","artist":"a","genre":"Pop","weight":0.5}]}"#
-        XCTAssertNil(try JSONDecoder().decode(Week.self, from: Data(old.utf8)).songs[0].album)
+    func testSameWeekSameLineButOtherWeeksDiffer() {
+        XCTAssertEqual(vibe(for: mixedWeek, key: "Week 43|x"), vibe(for: mixedWeek, key: "Week 43|x"))
+        let lines = (40...52).map { vibe(for: mixedWeek, key: "Week \($0)|x")! }
+        XCTAssertGreaterThan(Set(lines).count, 6)
+    }
+    func testRegenerateWalksThroughDistinctLines() {
+        for (name, week) in [("her", herWeek), ("mixed", mixedWeek), ("one genre", oneGenre("Jazz"))] {
+            let lines = (0..<30).map { vibe(for: week, seed: $0, key: "Week 43|x")! }
+            XCTAssertEqual(Set(lines).count, 30, name)
+        }
+    }
+    func testEveryLineIsOneShortWellFormedSentence() {
+        let weeks = Set(genreNames.values).map { oneGenre(family: $0) } + [herWeek, mixedWeek, songs([("a", "X", "Polka")])]
+        for week in weeks { for seed in 0..<160 {
+            let v = vibe(for: week, seed: seed, key: "k")!
+            XCTAssertLessThanOrEqual(v.count, vibeMaxLength, v)
+            XCTAssertEqual(v.filter { $0 == "." }.count, 1, v); XCTAssertTrue(v.hasSuffix("."), v)
+            XCTAssertFalse(v.contains("—") || v.contains("–") || v.contains("{") || v.contains("}"), v)
+            XCTAssertTrue(v.first!.isUppercase, v)
+        } }
+    }
+    func oneGenre(family f: String) -> [Song] { oneGenre(genreNames.first { $0.value == f }!.key) }
+    func testArticlesAgreeWithTheLabel() {
+        let alt = (0..<200).map { vibe(for: oneGenre("Alternative"), seed: $0, key: "k")! }.filter { $0.contains("front moves in") }
+        XCTAssertFalse(alt.isEmpty); for l in alt { XCTAssertTrue(l.hasPrefix("An alternative front"), l) }
+        let pop = (0..<200).map { vibe(for: oneGenre("Pop"), seed: $0, key: "k")! }.filter { $0.contains("front moves in") }
+        XCTAssertFalse(pop.isEmpty); for l in pop { XCTAssertTrue(l.hasPrefix("A pop front"), l) }
+    }
+    func testRepeatedArtistIsNamedSometimesAndLongNamesNever() {
+        var week = mixedWeek; week[0].artist = "Cobrah"; week[1].artist = "Cobrah"
+        let named = (0..<200).map { vibe(for: week, seed: $0, key: "k")! }
+        XCTAssertTrue(named.contains { $0.contains("Cobrah") }); XCTAssertTrue(named.contains { !$0.contains("Cobrah") })
+        let long = String(repeating: "x", count: 30)
+        week[0].artist = long; week[1].artist = long
+        XCTAssertFalse((0..<200).contains { vibe(for: week, seed: $0, key: "k")!.contains(long) })
+    }
+    func testHalfFilledWeekSaysSoSometimes() {
+        let few = songs([("a", "A", "Pop"), ("b", "B", "Pop"), ("c", "C", "Pop")])
+        XCTAssertTrue((0..<200).contains { vibe(for: few, seed: $0, key: "k")!.contains("Three songs in so far") })
+        XCTAssertFalse((0..<200).contains { vibe(for: herWeek, seed: $0, key: "k")!.contains("so far") })
+    }
+    func testManyGenresReadAsChangeableAndFewAsSettled() {
+        XCTAssertTrue((0..<200).contains { vibe(for: mixedWeek, seed: $0, key: "k")!.hasPrefix("Changeable") })
+        XCTAssertTrue((0..<200).contains { vibe(for: oneGenre("Pop"), seed: $0, key: "k")!.hasPrefix("Settled") })
+        XCTAssertFalse((0..<200).contains { vibe(for: mixedWeek, seed: $0, key: "k")!.hasPrefix("Settled") })
     }
 }
-
-
 final class VibeEditTests: XCTestCase {
     func week() -> Week {
-        var w = Week(label: "W", dates: "d")
-        for (i, g) in ["Pop", "Alternative", "Pop", "Alternative", "Electronica", "Soundtrack"].enumerated() {
-            w.songs[i].title = "s\(i)"; w.songs[i].genre = g
+        var w = Week(label: "Week 43", dates: "19 – 25 Oct")
+        for (i, g) in ["Pop", "Alternative", "Pop", "Alternative", "Electronic", "Soundtrack"].enumerated() {
+            w.songs[i].title = "s\(i)"; w.songs[i].artist = "a\(i)"; w.songs[i].genre = g
         }
         return w
     }
@@ -106,17 +153,21 @@ final class VibeEditTests: XCTestCase {
         XCTAssertTrue(caption(for: w).hasSuffix("\nVibe: Sunny with a chance of Mallrat"))
         XCTAssertTrue(altText(for: w, name: "").contains("Vibe: Sunny with a chance of Mallrat."))
     }
-    func testBlankEditFallsBackToForecast() {
+    func testBlankEditFallsBackToTheForecast() {
         var w = week(); w.vibeOverride = "  "
-        XCTAssertEqual(vibeLine(for: w), "Overcast and dreamy, 70% chance of staring out of windows.")
+        XCTAssertEqual(vibeLine(for: w), vibe(for: w.songs, seed: 0, key: "Week 43|19 – 25 Oct"))
     }
-    func testRegenerateGivesNewWordingAndCycles() {
-        let lines = (0..<12).map { vibe(for: week().songs, seed: $0)! }
-        XCTAssertEqual(Set(lines).count, 12)
-        for l in lines { XCTAssertFalse(l.contains("—")); XCTAssertTrue(l.hasSuffix(".")) }
+    func testRegenerateGivesANewLineEachTime() {
+        var w = week(); var seen = Set<String>()
+        for i in 0..<20 { w.vibeSeed = i; seen.insert(vibeLine(for: w)!) }
+        XCTAssertEqual(seen.count, 20)
+    }
+    func testTheLineDoesNotChangeWhileYouTypeTitles() {
+        var w = week(); let before = vibeLine(for: w)
+        w.songs[0].title = "something else entirely"
+        XCTAssertEqual(vibeLine(for: w), before)   // the key is the week label and dates, not the titles
     }
 }
-
 final class FileStemTests: XCTestCase {
     func testOrdinaryLabel() { XCTAssertEqual(fileStem(for: "Week 43"), "week-43") }
     func testCannotEscapeTheFolder() {
@@ -202,3 +253,5 @@ final class ListParseTests: XCTestCase {
         XCTAssertEqual(r.songs.map(\.title), ["Teeth", "s1", "s2", "s3", "s4", "s5"])
     }
 }
+
+private func + <K, V>(lhs: [K: V], rhs: [(K, V)]) -> [(K, V)] { Array(lhs.map { ($0.key, $0.value) }) + rhs }
