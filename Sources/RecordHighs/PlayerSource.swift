@@ -1,6 +1,8 @@
 import Foundation
 import RecordCore
 
+struct LibraryMatch { var title, artist, album, genre: String; var artwork: Data? }
+
 struct NowPlaying { var title, artist, album, genre: String; var artwork: Data? }
 
 /// A music player the app can read the current track from. Spotify can conform later.
@@ -10,6 +12,8 @@ protocol PlayerSource {
     /// Tracks played, or Shazamed, since `since`. Local only: no network.
     func recent(since: Date) throws -> [Candidate]
     func artwork(id: String) -> Data?
+    /// One song looked up in the player's library on this Mac.
+    func libraryMatch(title: String, artist: String) -> LibraryMatch?
 }
 
 struct PlayerError: LocalizedError { let errorDescription: String? }
@@ -72,5 +76,40 @@ struct AppleMusicSource: PlayerSource {
     func artwork(id: String) -> Data? {
         guard id.allSatisfy(\.isHexDigit) else { return nil }   // persistent IDs are hex; nothing else goes into the script
         return try? run("return raw data of artwork 1 of (first track of library playlist 1 whose persistent ID is \"\(id)\")").data
+    }
+
+    /// Looks one song up in the Apple Music library. The title and artist reach the script as parameters of a
+    /// handler call, never as part of its text, so nothing a person types or pastes can run as AppleScript.
+    func libraryMatch(title: String, artist: String) -> LibraryMatch? {
+        guard !title.isEmpty else { return nil }
+        let source = """
+        on lookup(t, a)
+            tell application "Music"
+                if a is "" then
+                    set hits to (every track of library playlist 1 whose name is t)
+                else
+                    set hits to (every track of library playlist 1 whose name is t and artist contains a)
+                end if
+                if (count of hits) is 0 then return {}
+                set x to item 1 of hits
+                return {name of x, artist of x, album of x, genre of x, persistent ID of x}
+            end tell
+        end lookup
+        """
+        var err: NSDictionary?
+        guard let script = NSAppleScript(source: source), script.compileAndReturnError(&err) else { return nil }
+        func code(_ s: String) -> FourCharCode { s.utf8.reduce(0) { $0 << 8 | FourCharCode($1) } }
+        let event = NSAppleEventDescriptor(eventClass: code("ascr"), eventID: code("psbr"), targetDescriptor: .currentProcess(),
+                                           returnID: -1, transactionID: 0)   // -1: any return ID, 0: no transaction
+        event.setParam(NSAppleEventDescriptor(string: "lookup"), forKeyword: code("snam"))
+        let args = NSAppleEventDescriptor.list()
+        args.insert(NSAppleEventDescriptor(string: title), at: 1)
+        args.insert(NSAppleEventDescriptor(string: artist), at: 2)
+        event.setParam(args, forKeyword: code("----"))
+        let r = script.executeAppleEvent(event, error: &err)
+        guard err == nil, r.numberOfItems == 5 else { return nil }
+        return LibraryMatch(title: r.atIndex(1)?.stringValue ?? title, artist: r.atIndex(2)?.stringValue ?? artist,
+                            album: r.atIndex(3)?.stringValue ?? "", genre: r.atIndex(4)?.stringValue ?? "",
+                            artwork: artwork(id: r.atIndex(5)?.stringValue ?? ""))
     }
 }

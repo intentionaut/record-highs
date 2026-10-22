@@ -24,7 +24,12 @@ hosts=$(grep -rhoE 'https?://[^/"]+|"\.[a-z.]+\.com"' $SRC | sort -u | tr '\n' '
 # Data(contentsOf:) and friends fetch web addresses too, so each one must be a local-file read.
 remote=$(grep -rnE 'contentsOf:' $SRC | grep -vE 'Store.swift|Samples.swift|isFileURL|fileURLWithPath')
 [ -z "$remote" ] && ok "every contentsOf: read is a local file" || bad "contentsOf: that could fetch a URL: $remote"
-grep -q 'lookupEnabled = false' $SRC/RecordHighs/App.swift && ok "cover lookup defaults to off" || bad "lookup not off by default"
+grep -q 'AppStorage("lookupEnabled") private var lookupEnabled = true' $SRC/RecordHighs/App.swift && grep -q 'it is on by default' README.md \
+  && ok "online lookup is a setting, on by default, and the README says so" || bad "lookup default and README disagree"
+# What a person types or pastes must reach Apple Music only as handler parameters, never as script text.
+grep -qE 'setParam\(args|args\.insert\(NSAppleEventDescriptor\(string: title\)' $SRC/RecordHighs/PlayerSource.swift \
+  && ! grep -nE '\\\((title|artist)' $SRC/RecordHighs/PlayerSource.swift >/dev/null \
+  && ok "title and artist reach Apple Music as parameters, not script text" || bad "title or artist is spliced into AppleScript text"
 
 # 3. File writes appear only in Export.swift (the PNG) and Store.swift (your week, in the app's container); settings are UserDefaults.
 wr=$(grep -rlE '\.write\(to|createFile|FileHandle|fopen|FileManager\.default\.(copy|move|create)' $SRC | grep -vE 'Export.swift|Store.swift')

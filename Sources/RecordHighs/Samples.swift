@@ -28,5 +28,12 @@ import RecordCore
             print(try Export.write(poster, to: URL(fileURLWithPath: dir), stem: fileStem(for: w.label)).path)
         } catch { print(error.localizedDescription); exit(1) }
     }
+
+    /// `swift run RecordHighs --lookup <title> <artist>` prints what the Apple Music library says about a song.
+    static func lookup(title: String, artist: String) {
+        if let m = AppleMusicSource().libraryMatch(title: title, artist: artist) {
+            print("FOUND | \(m.title) | \(m.artist) | \(m.album) | \(m.genre) | artwork \(m.artwork?.count ?? 0) bytes")
+        } else { print("NOT FOUND") }
+    }
 }
 #endif

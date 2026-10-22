@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
         let args = CommandLine.arguments
         // `swift run RecordHighs --samples <dir>` renders the sample poster and quits
         if let i = args.firstIndex(of: "--samples"), i + 1 < args.count { Samples.render(into: URL(fileURLWithPath: args[i + 1])); exit(0) }
+        if let i = args.firstIndex(of: "--lookup"), i + 2 < args.count { Samples.lookup(title: args[i + 1], artist: args[i + 2]); exit(0) }
         // `swift run RecordHighs --render <week.json> <dir> [name]` prints a saved week as a PNG and quits
         if let i = args.firstIndex(of: "--render"), i + 2 < args.count { Samples.render(week: args[i + 1], into: args[i + 2], name: i + 3 < args.count ? args[i + 3] : ""); exit(0) }
         #endif
@@ -19,7 +20,7 @@ struct EditorView: View {
     @State private var w = Store.load()
         ?? Week(label: "Week \(Calendar.current.component(.weekOfYear, from: .now))", dates: EditorView.thisWeek())
     @AppStorage("name") private var name = ""
-    @AppStorage("lookupEnabled") private var lookupEnabled = false
+    @AppStorage("lookupEnabled") private var lookupEnabled = true
     @AppStorage("exportFolder") private var folderBookmark = Data()
     @State private var status = ""
     @State private var edits = 0
@@ -64,8 +65,8 @@ struct EditorView: View {
                 }
                 Section("Settings") {
                     Toggle(isOn: $lookupEnabled) {
-                        Text("Allow Find cover")
-                        Text("Sends a song's title and artist to the iTunes Search API, once per press.")
+                        Text("Look up covers and genres online")
+                        Text("For songs you add, after checking your Apple Music library on this Mac, Apple's public search is asked for the cover and genre. It gets the title and artist, one request per song, and nothing else.")
                     }
                     HStack {
                         Button("Clear all songs…", role: .destructive) { confirmClear = true }
@@ -161,12 +162,14 @@ struct EditorView: View {
     func count(_ n: Int, _ noun: String) -> String { "\(n) \(noun)\(n == 1 ? "" : "s")" }
 
     func addPasted() {
+        let had = Set(w.songs.filter { !$0.title.isEmpty }.map(\.id))
         let r = place(parseSongList(pasted), into: w.songs)
         w.songs = r.songs
+        let added = w.songs.filter { !$0.title.isEmpty && !had.contains($0.id) }.map(\.id)
         status = "Added \(count(r.added, "song"))." + (r.duplicates > 0 ? " \(r.duplicates) already on the week." : "")
             + (r.noRoom > 0 ? " \(r.noRoom) didn't fit." : "")
-            + (lookupEnabled ? " Press Find cover on each for artwork." : " Drop images on the slots, or turn on Find cover in Settings.")
         pasted = ""; showPaste = false
+        enrich(added)
     }
 
     var hasEmptySlot: Bool { w.songs.contains { $0.title.isEmpty } }
@@ -202,6 +205,39 @@ struct EditorView: View {
                 : "Filled \(picks.count) from \(player.name)" + (latest.map { " (latest play \(day.string(from: $0)))" } ?? "")
                 + (shazams > 0 ? ", \(shazams) from Shazam" : "") + "."
         } catch { status = error.localizedDescription }
+    }
+
+    /// Fills in the cover, album and genre for songs that lack them: the Apple Music library on this Mac first, then
+    /// Apple's public search if lookups are on. One song at a time so the window stays usable, and nothing you
+    /// have already set (a dropped cover, a typed genre) is overwritten.
+    func enrich(_ ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        Task { @MainActor in
+            var local = 0, online = 0, missing = 0
+            for (n, id) in ids.enumerated() {
+                guard let first = w.songs.firstIndex(where: { $0.id == id }) else { continue }
+                let (title, artist) = (w.songs[first].title, w.songs[first].artist)
+                status = "Looking up \(title) (\(n + 1) of \(ids.count))…"
+                await Task.yield()
+                var found = false
+                if let m = player.libraryMatch(title: title, artist: artist),
+                   let i = w.songs.firstIndex(where: { $0.id == id && $0.title == title }) {
+                    w.songs[i] = fillMissing(w.songs[i], genre: m.genre, album: m.album, cover: m.artwork)
+                    found = true; local += 1
+                }
+                if lookupEnabled, let i = w.songs.firstIndex(where: { $0.id == id && $0.title == title }),
+                   w.songs[i].cover == nil || w.songs[i].genre.isEmpty,
+                   let r = try? await CoverLookup.find(title: title, artist: artist),
+                   let j = w.songs.firstIndex(where: { $0.id == id && $0.title == title }) {
+                    w.songs[j] = fillMissing(w.songs[j], genre: r.genre, album: r.album, cover: r.cover)
+                    if !found { online += 1 }
+                    found = true
+                }
+                if !found { missing += 1 }
+            }
+            status = "Looked up \(count(ids.count, "song")): \(local) in your Apple Music library, \(online) online"
+                + (missing > 0 ? ", \(missing) not found. Drop a cover on those, or press Find cover." : ".")
+        }
     }
 
     func find(_ song: Binding<Song>) {

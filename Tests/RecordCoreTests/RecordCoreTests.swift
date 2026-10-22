@@ -255,3 +255,21 @@ final class ListParseTests: XCTestCase {
 }
 
 private func + <K, V>(lhs: [K: V], rhs: [(K, V)]) -> [(K, V)] { Array(lhs.map { ($0.key, $0.value) }) + rhs }
+
+final class FillMissingTests: XCTestCase {
+    func testFillsOnlyWhatIsMissing() {
+        var s = Song(); s.title = "t"
+        let filled = fillMissing(s, genre: "Pop", album: "Album", cover: Data([1]))
+        XCTAssertEqual(filled.genre, "Pop"); XCTAssertEqual(filled.album, "Album"); XCTAssertEqual(filled.cover, Data([1]))
+    }
+    func testNeverOverwritesWhatThePersonSet() {
+        var s = Song(); s.title = "t"; s.genre = "Jazz"; s.album = "Mine"; s.cover = Data([9])
+        let filled = fillMissing(s, genre: "Pop", album: "Album", cover: Data([1]))
+        XCTAssertEqual(filled.genre, "Jazz"); XCTAssertEqual(filled.album, "Mine"); XCTAssertEqual(filled.cover, Data([9]))
+    }
+    func testEmptyResultsChangeNothing() {
+        var s = Song(); s.title = "t"
+        XCTAssertEqual(fillMissing(s, genre: "", album: nil, cover: nil), s)
+        XCTAssertEqual(fillMissing(s, genre: "", album: "", cover: nil), s)
+    }
+}

@@ -27,6 +27,15 @@ public struct Week: Codable, Equatable {
     }
 }
 
+/// Adds what a lookup found without overwriting anything the person already has: a typed genre, a dropped cover.
+public func fillMissing(_ song: Song, genre: String, album: String?, cover: Data?) -> Song {
+    var s = song
+    if s.genre.isEmpty, !genre.isEmpty { s.genre = genre }
+    if (s.album ?? "").isEmpty, let a = album, !a.isEmpty { s.album = a }
+    if s.cover == nil { s.cover = cover }
+    return s
+}
+
 /// The same week with all six songs and the vibe cleared; the week label, dates and name stay.
 public func cleared(_ week: Week) -> Week {
     Week(label: week.label, dates: week.dates)
