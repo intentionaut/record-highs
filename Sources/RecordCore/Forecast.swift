@@ -107,3 +107,30 @@ public func vibe(for songs: [Song], seed: Int = 0, key: String = "") -> String? 
     let line = render(shape)
     return line.count <= vibeMaxLength ? line : render(baseShapes[0])
 }
+
+/// Cleans a line written by a language model, or rejects it. The model is asked for one short weather-style
+/// sentence, but it can still return two sentences, dashes, quotes, markdown, or talk to the reader, so nothing it
+/// writes goes on the poster until it passes this. Returns nil when the line can't be made safe to use.
+public func tidyForecast(_ raw: String) -> String? {
+    var t = raw.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+    for prefix in ["vibe:", "forecast:", "outlook:"] where t.lowercased().hasPrefix(prefix) && prefix != "outlook:" {
+        t = String(t.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces)
+    }
+    t = t.trimmingCharacters(in: CharacterSet(charactersIn: "\"'`*_“”‘’ "))
+    // First sentence only.
+    if let end = t.range(of: #"[.!?](\s|$)"#, options: .regularExpression) { t = String(t[..<end.lowerBound]) }
+    t = t.replacingOccurrences(of: "—", with: ",").replacingOccurrences(of: "–", with: ",")
+        .replacingOccurrences(of: " ,", with: ",").replacingOccurrences(of: ",,", with: ",")
+        .replacingOccurrences(of: "  ", with: " ").trimmingCharacters(in: CharacterSet(charactersIn: " ,;:"))
+    guard !t.isEmpty else { return nil }
+    let lower = t.lowercased()
+    if lower.contains("http") || lower.contains("www.") || t.contains("@") || t.contains("#") || t.contains("{") || t.contains("<") { return nil }
+    // It talks about the weather, not to the reader or about the person.
+    if lower.range(of: #"\b(you|your|yours|you're|i|i'm|me|my|we|our)\b"#, options: .regularExpression) != nil { return nil }
+    let words = t.split(separator: " ").count
+    guard words >= 4, words <= 30 else { return nil }
+    let line = upperFirstLetter(t) + "."
+    return line.count <= vibeMaxLength ? line : nil
+}
+
+private func upperFirstLetter(_ s: String) -> String { s.prefix(1).uppercased() + s.dropFirst() }

@@ -273,3 +273,61 @@ final class FillMissingTests: XCTestCase {
         XCTAssertEqual(fillMissing(s, genre: "", album: "", cover: nil), s)
     }
 }
+
+final class TidyForecastTests: XCTestCase {
+    func testAGoodLinePassesThroughUnchanged() {
+        let ok = "Overcast and dreamy, 70% chance of staring out of windows."
+        XCTAssertEqual(tidyForecast(ok), ok)
+    }
+    func testKeepsOnlyTheFirstSentence() {
+        XCTAssertEqual(tidyForecast("Bright spells with a soft breeze, 60% chance of humming. Stay hydrated and have fun this week!"),
+                       "Bright spells with a soft breeze, 60% chance of humming.")
+    }
+    func testDashesBecomeCommas() {
+        let a = tidyForecast("Hazy skies — and a gentle drift, 40% chance of daydreaming")!
+        let b = tidyForecast("Hazy skies – and a gentle drift, 40% chance of daydreaming")!
+        XCTAssertFalse(a.contains("—") || a.contains("–") || b.contains("—") || b.contains("–"))
+        XCTAssertEqual(a, "Hazy skies, and a gentle drift, 40% chance of daydreaming.")
+    }
+    func testStripsPrefixesQuotesAndMarkdown() {
+        XCTAssertEqual(tidyForecast("Vibe: \"**Low cloud and slow bass, 50% chance of lingering over coffee**\""),
+                       "Low cloud and slow bass, 50% chance of lingering over coffee.")
+        XCTAssertEqual(tidyForecast("Forecast: Scattered showers of guitar, 30% chance of air drums!"),
+                       "Scattered showers of guitar, 30% chance of air drums.")
+    }
+    func testAddsAFullStopAndCapitalises() {
+        XCTAssertEqual(tidyForecast("mostly sunny with gusty beats, 80% chance of dancing"), "Mostly sunny with gusty beats, 80% chance of dancing.")
+    }
+    func testRejectsTalkingToOrAboutThePerson() {
+        for bad in ["You seem sad this week, with a 50% chance of crying", "Your taste is a front of pure chaos, 20% chance of regret",
+                    "I think the week looks stormy, 50% chance of loud music", "We are in for heavy showers of bass and joy",
+                    "Heavy skies and it reminds me of rain, 40% chance of tears"] {
+            XCTAssertNil(tidyForecast(bad), bad)
+        }
+    }
+    func testRejectsLinksMarkupAndJunk() {
+        for bad in ["See https://example.com for a stormy forecast of rock", "Stormy skies @someone with a 50% chance of rock",
+                    "# Forecast heading with scattered showers of rock", "{sky} and {feel} with a chance of {activity}", "", "   ", "Rain", "Rain again today"] {
+            XCTAssertNil(tidyForecast(bad), bad)
+        }
+    }
+    func testRejectsALineThatIsTooLong() {
+        XCTAssertNil(tidyForecast(String(repeating: "Cloudy with scattered showers of strings, ", count: 12)))
+        XCTAssertNil(tidyForecast((0..<40).map { "word\($0)" }.joined(separator: " ")))
+        XCTAssertNil(tidyForecast(String(repeating: "thunderstorms ", count: 14)))   // 14 words, over the character limit
+    }
+    func testWhateverComesOutIsAlwaysOneShortSentenceWithoutDashes() {
+        let inputs = ["Good. Second sentence here.", "One — two — three four five six seven", "Hazy!!! with scattered beats and showers", "Mild, with a mellow breeze, 30% chance of tea?"]
+        for i in inputs {
+            guard let t = tidyForecast(i) else { continue }
+            XCTAssertEqual(t.filter { $0 == "." }.count, 1, t); XCTAssertTrue(t.hasSuffix(".")); XCTAssertLessThanOrEqual(t.count, vibeMaxLength)
+            XCTAssertFalse(t.contains("—") || t.contains("–") || t.contains("!") || t.contains("?"))
+        }
+    }
+    func testWeekSavesWithAndWithoutTheModelFlag() throws {
+        var w = Week(label: "W", dates: "d"); w.vibeOverride = "x"; w.vibeFromModel = true
+        XCTAssertEqual(try JSONDecoder().decode(Week.self, from: JSONEncoder().encode(w)).vibeFromModel, true)
+        let old = #"{"label":"W","dates":"d","songs":[]}"#
+        XCTAssertNil(try JSONDecoder().decode(Week.self, from: Data(old.utf8)).vibeFromModel)
+    }
+}

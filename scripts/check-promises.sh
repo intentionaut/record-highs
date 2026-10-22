@@ -40,6 +40,11 @@ grep -rqE 'UserDefaults|@AppStorage' $SRC && ok "settings stored in UserDefaults
 # 4. Nothing reads or posts outward beyond the above: no analytics, accounts or upload code.
 # Code lines only (comments stripped), so a comment saying "never uploaded" doesn't trip it.
 grep -rhv '^\s*//' $SRC | sed 's|  *// .*||' | grep -qiE 'analytics|telemetry|uploadTask|upload\(|httpMethod|"POST"' && bad "analytics/upload code found" || ok "no analytics, accounts or upload code"
+# The optional on-device model: one file, guarded by an availability check, and no network code of its own.
+fm=$(grep -rl 'FoundationModels' $SRC | sort | tr '\n' ' ')
+[ "$fm" = "Sources/RecordHighs/ModelForecast.swift " ] && grep -q '#available(macOS 26' $SRC/RecordHighs/ModelForecast.swift \
+  && ok "on-device model code is one guarded file" || bad "FoundationModels used outside ModelForecast.swift, or not guarded: $fm"
+
 # 5. The signed app: hardened runtime on, developer options compiled out, file names made safe.
 codesign -dv "$APP" 2>&1 | grep -q 'flags=.*runtime' && ok "hardened runtime is on" || bad "hardened runtime is off"
 # Short Swift strings live inside the code, so look for the developer code itself, not its option names.

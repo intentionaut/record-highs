@@ -22,6 +22,7 @@ public struct Week: Codable, Equatable {
     public var label: String, dates: String, songs: [Song]
     public var vibeOverride: String?   // your edit of the vibe line; nil means use the forecast
     public var vibeSeed: Int?          // which regenerated wording; optional so older saves still load
+    public var vibeFromModel: Bool?    // true when vibeOverride was written by the on-device model, not typed by the person
     public init(label: String, dates: String, songs: [Song] = (0..<6).map { _ in Song() }) {
         self.label = label; self.dates = dates; self.songs = songs
     }

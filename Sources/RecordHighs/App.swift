@@ -26,6 +26,8 @@ struct EditorView: View {
     @State private var edits = 0
     @State private var confirmClear = false
     @State private var showPaste = false
+    @State private var modelAvailable = ModelForecast.isAvailable
+    @State private var writing = false
     @State private var pasted = ""
     @State private var beforeClear: Week?     // one level of undo for Clear all             // bumps on every change; the PNG autosaves a moment after the last one
     private let player: PlayerSource = AppleMusicSource()
@@ -52,13 +54,19 @@ struct EditorView: View {
                     TextField("Dates", text: $w.dates, prompt: Text("19 – 25 Oct"))
                     TextField("Your name", text: $name, prompt: Text("Optional"))
                     VStack(alignment: .leading, spacing: 6) {
-                        TextField("Vibe", text: Binding(get: { vibeLine(for: w) ?? "" }, set: { w.vibeOverride = $0 }),
+                        TextField("Vibe", text: Binding(get: { vibeLine(for: w) ?? "" }, set: { w.vibeOverride = $0; w.vibeFromModel = nil }),
                                   prompt: Text("Add songs for a forecast"), axis: .vertical)
                             .lineLimit(1...3)
                         HStack {
-                            Text(w.vibeOverride == nil ? "Forecast from your songs" : "Your words").font(.caption).foregroundStyle(.secondary)
+                            Text(w.vibeFromModel == true ? "Written on this Mac from your songs"
+                                 : w.vibeOverride == nil ? "Forecast from your songs" : "Your words").font(.caption).foregroundStyle(.secondary)
                             Spacer()
-                            Button("Regenerate") { w.vibeOverride = nil; w.vibeSeed = (w.vibeSeed ?? 0) + 1 }
+                            if modelAvailable {
+                                Button(writing ? "Writing…" : "Write with Apple Intelligence", action: writeWithModel)
+                                    .controlSize(.small).disabled(writing || w.songs.allSatisfy { $0.title.isEmpty })
+                                    .accessibilityHint("Asks the built-in model on this Mac to write the line. Nothing leaves your Mac.")
+                            }
+                            Button("Regenerate") { w.vibeOverride = nil; w.vibeFromModel = nil; w.vibeSeed = (w.vibeSeed ?? 0) + 1 }
                                 .controlSize(.small).accessibilityHint("Replaces the vibe line with a new forecast from your songs")
                         }
                     }
@@ -186,6 +194,18 @@ struct EditorView: View {
             if let art = now.artwork { song.wrappedValue.cover = art }
             status = "From \(player.name): \(now.album)"
         } catch { status = error.localizedDescription }
+    }
+
+    func writeWithModel() {
+        writing = true
+        Task { @MainActor in
+            defer { writing = false }
+            do {
+                if let line = try await ModelForecast.write(for: w.songs) {
+                    w.vibeOverride = line; w.vibeFromModel = true; status = "Vibe written on this Mac."
+                } else { status = "The Mac's model gave a line that couldn't be used, so the forecast stays. Try again." }
+            } catch { status = "The Mac's model couldn't write a line (\(error.localizedDescription)), so the forecast stays." }
+        }
     }
 
     func fillFromWeek() {
