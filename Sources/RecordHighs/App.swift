@@ -13,7 +13,16 @@ import UniformTypeIdentifiers
         if let i = args.firstIndex(of: "--render"), i + 2 < args.count { Samples.render(week: args[i + 1], into: args[i + 2], name: i + 3 < args.count ? args[i + 3] : ""); exit(0) }
         #endif
     }
-    var body: some Scene { WindowGroup("Record Highs") { EditorView().navigationSubtitle("Your week in music, as a weather report.") } }
+    @Environment(\.openWindow) private var openWindow
+    var body: some Scene {
+        // Window, not WindowGroup: a second "Open" from the menu bar must reuse the window, not stack a new one.
+        Window("Record Highs", id: "main") { EditorView().navigationSubtitle("Your week in music, as a weather report.") }
+        MenuBarExtra {
+            Button("Open Record Highs") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
+            Divider()
+            Button("Quit Record Highs") { NSApp.terminate(nil) }.keyboardShortcut("q")
+        } label: { Image(nsImage: MenuGlyph.image) }
+    }
 }
 
 struct EditorView: View {
