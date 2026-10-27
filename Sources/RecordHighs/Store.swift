@@ -9,5 +9,10 @@ enum Store {
         return dir.appendingPathComponent("week.json")
     }
     static func load() -> Week? { (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Week.self, from: $0) } }
+    /// Keeps a rolled-over week beside the current one (week-week-43.json) so its songs and covers can be recovered.
+    static func archive(_ week: Week) {
+        let name = "week-\(fileStem(for: week.label)).json"
+        try? JSONEncoder().encode(week).write(to: url.deletingLastPathComponent().appendingPathComponent(name), options: .atomic)
+    }
     static func save(_ week: Week) { try? JSONEncoder().encode(week).write(to: url, options: .atomic) }
 }

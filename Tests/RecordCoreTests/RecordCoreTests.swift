@@ -331,3 +331,25 @@ final class TidyForecastTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(Week.self, from: Data(old.utf8)).vibeFromModel)
     }
 }
+
+final class WeekRolloverTests: XCTestCase {
+    var cal: Calendar { var c = Calendar(identifier: .gregorian); c.firstWeekday = 2; c.minimumDaysInFirstWeek = 4; c.timeZone = .gmt; return c }
+    func date(_ y: Int, _ m: Int, _ d: Int) -> Date { cal.date(from: DateComponents(year: y, month: m, day: d, hour: 12))! }
+
+    func testCalendarWeekLabelAndDates() {
+        let w = calendarWeek(for: date(2026, 10, 27), calendar: cal)
+        XCTAssertEqual(w.label, "Week 44"); XCTAssertEqual(w.dates, "26 Oct – 1 Nov")
+    }
+    func testStaleAutoWeekRollsAndClearsSongs() {
+        var old = Week(label: "Week 43", dates: "19 – 25 Oct"); old.songs[0].title = "X"
+        let next = rolledWeek(old, now: date(2026, 10, 27), calendar: cal)
+        XCTAssertEqual(next?.label, "Week 44"); XCTAssertEqual(next?.songs[0].title, "")
+    }
+    func testCurrentWeekIsLeftAlone() {
+        XCTAssertNil(rolledWeek(Week(label: "Week 44", dates: "26 Oct – 1 Nov"), now: date(2026, 10, 28), calendar: cal))
+    }
+    func testHandEditedLabelIsLeftAlone() {
+        XCTAssertNil(rolledWeek(Week(label: "Holiday mix", dates: "x"), now: date(2026, 10, 27), calendar: cal))
+        XCTAssertNil(rolledWeek(Week(label: "Week 43 (edited)", dates: "x"), now: date(2026, 10, 27), calendar: cal))
+    }
+}

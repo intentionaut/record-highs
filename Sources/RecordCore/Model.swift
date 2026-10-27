@@ -37,6 +37,23 @@ public func fillMissing(_ song: Song, genre: String, album: String?, cover: Data
     return s
 }
 
+/// The calendar week's label and date range, e.g. ("Week 44", "26 Oct – 1 Nov"). Follows the locale's first weekday.
+public func calendarWeek(for date: Date = .now, calendar cal: Calendar = .current) -> (label: String, dates: String) {
+    let label = "Week \(cal.component(.weekOfYear, from: date))"
+    guard let w = cal.dateInterval(of: .weekOfYear, for: date) else { return (label, "") }
+    let f = DateFormatter(); f.dateFormat = "d MMM"; f.calendar = cal; f.timeZone = cal.timeZone
+    return (label, "\(f.string(from: w.start)) – \(f.string(from: w.end.addingTimeInterval(-1)))")
+}
+
+/// The week to show now. A saved week whose label is the automatic "Week N" and is not this week's number rolls to
+/// the current week with songs cleared; a hand-edited label is left alone. Returns nil when nothing should change.
+/// shortcut: a gap of exactly a year lands on the same number and is not rolled, fine for a weekly poster.
+public func rolledWeek(_ week: Week, now: Date = .now, calendar: Calendar = .current) -> Week? {
+    let cur = calendarWeek(for: now, calendar: calendar)
+    guard week.label != cur.label, week.label.range(of: #"^Week \d{1,2}$"#, options: .regularExpression) != nil else { return nil }
+    return Week(label: cur.label, dates: cur.dates)
+}
+
 /// The same week with all six songs and the vibe cleared; the week label, dates and name stay.
 public func cleared(_ week: Week) -> Week {
     Week(label: week.label, dates: week.dates)

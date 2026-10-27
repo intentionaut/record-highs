@@ -26,8 +26,7 @@ import UniformTypeIdentifiers
 }
 
 struct EditorView: View {
-    @State private var w = Store.load()
-        ?? Week(label: "Week \(Calendar.current.component(.weekOfYear, from: .now))", dates: EditorView.thisWeek())
+    @State private var w = EditorView.startingWeek()
     @AppStorage("name") private var name = ""
     @AppStorage("lookupEnabled") private var lookupEnabled = true
     @AppStorage("exportFolder") private var folderBookmark = Data()
@@ -120,6 +119,8 @@ struct EditorView: View {
         .frame(minHeight: 1350 * 0.45 + 80)
         .sheet(isPresented: $showPaste) { pasteSheet }
         .onChange(of: w) { Store.save(w); edits += 1 }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in rollWeek() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in rollWeek() }
         .onChange(of: name) { edits += 1 }
         .task(id: edits) {
             guard edits > 0, (try? await Task.sleep(for: .seconds(1.5))) != nil else { return }
@@ -316,9 +317,19 @@ struct EditorView: View {
         } catch { status = error.localizedDescription }
     }
 
-    static func thisWeek() -> String {
-        let cal = Calendar.current, f = DateFormatter(); f.dateFormat = "d MMM"
-        guard let w = cal.dateInterval(of: .weekOfYear, for: .now) else { return "" }
-        return "\(f.string(from: w.start)) – \(f.string(from: w.end.addingTimeInterval(-1)))"
+    /// The saved week, rolled to the current calendar week if it has gone stale; a fresh week on first launch.
+    static func startingWeek() -> Week {
+        guard let saved = Store.load() else { let c = calendarWeek(); return Week(label: c.label, dates: c.dates) }
+        guard let next = rolledWeek(saved) else { return saved }
+        Store.archive(saved); Store.save(next)
+        return next
+    }
+
+    /// The menu-bar app can stay open for days, so the week is rechecked on activation and at midnight.
+    func rollWeek() {
+        guard let next = rolledWeek(w) else { return }
+        let old = w.label
+        Store.archive(w); w = next; beforeClear = nil
+        status = "New week: \(next.label). \(old)'s songs are kept in the app's folder."
     }
 }
